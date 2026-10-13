@@ -1423,6 +1423,151 @@ body.dashboard-mode summary {
 }
 
 
+/* =========================================================
+   MENU LATERAL (somente gestor)
+   ========================================================= */
+
+body.has-sidebar {
+  padding-left: 232px;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 216px;
+  z-index: 20;
+
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  padding: 32px 14px;
+
+  background: linear-gradient(180deg, #ff8a2b 0%, #f26a1b 55%, #e55a0f 100%);
+  box-shadow: 6px 0 30px rgba(242, 106, 27, 0.18);
+}
+
+body.dashboard-mode .sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+
+  border: 0;
+  border-radius: 12px;
+
+  background: transparent;
+  color: #fff;
+  box-shadow: none;
+
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+
+body.dashboard-mode .sidebar .nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+body.dashboard-mode .sidebar .nav-item:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: none;
+  box-shadow: none;
+}
+
+body.dashboard-mode .sidebar .nav-item.active {
+  background: #fff;
+  color: var(--ac);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* no celular o menu vira uma barra fixa embaixo */
+@media (max-width: 800px) {
+  body.has-sidebar {
+    padding-left: 0;
+    padding-bottom: 80px;
+  }
+
+  .sidebar {
+    top: auto;
+    width: auto;
+    right: 0;
+
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 4px;
+
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -6px 24px rgba(242, 106, 27, 0.2);
+  }
+
+  body.dashboard-mode .sidebar .nav-item {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+
+    padding: 8px 4px;
+
+    font-size: 12px;
+    text-align: center;
+  }
+}
+
+/* =========================================================
+   TELA "AVALIAÇÕES"
+   ========================================================= */
+
+.page-head {
+  margin-bottom: 16px;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+
+.filtros {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px 14px;
+  align-items: end;
+}
+
+.filtros .fl label {
+  margin: 0 0 6px;
+}
+
+.item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f3ece4;
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.av-nome {
+  color: var(--ink);
+}
+
+button.mais {
+  margin-top: 14px;
+}
+
+
 
 /* =========================================================
    RESPONSIVO

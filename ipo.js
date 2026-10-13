@@ -74,6 +74,8 @@ const media = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0;
 
 // o status é sempre recalculado a partir do IPO (avaliações antigas podem ter faixas antigas salvas)
 const norm = g => ({ ...g, status: classificar(g.ipo) });
+const kpi = (l, v, c = "") => `<div class="card"><div class="muted">${l}</div><div class="kpi" ${c ? `style="color:${c}"` : ""}>${v}</div></div>`;
+const dBadge = d => d === null ? "" : `<span class="dl ${d > 0 ? "up" : d < 0 ? "dn" : "eq"}">${d > 0 ? "▲ +" : d < 0 ? "▼ " : "= "}${d}</span>`;
 
 /* ---------- gestor + evolução ---------- */
 const por = x => x.managerName ? ` · Avaliado por <b>${esc(x.managerName)}</b>` : "";
@@ -179,9 +181,8 @@ export function vistaGestor(colabs, grades, o = {}) {
   const nome = Object.fromEntries(colabs.map(c => [c.id, c.name]));
   const ult = colabs.map(c => ({ c, g: grades.filter(x => x.employeeId === c.id).sort(porData)[0] })).filter(x => x.g).sort((a, b) => b.g.ipo - a.g.ipo);
   const cont = k => ult.filter(x => x.g.status === k).length;
-  const kpi = (l, v, c = "") => `<div class="card"><div class="muted">${l}</div><div class="kpi" ${c ? `style="color:${c}"` : ""}>${v}</div></div>`;
   const mIpo = media(ult.map(x => x.g.ipo));
-  const recentes = [...grades].sort(porData).slice(0, 8);
+  const recentes = [...grades].sort(porData).slice(0, 5);
   return `<div class="grid">${kpi("Colaboradores avaliados", ult.length)}${kpi("Média do IPO", ult.length ? mIpo.toFixed(1) : "–", STATUS[classificar(mIpo)].cor)}${kpi("Prontos (80 a 100)", cont("pronto"))}${kpi("Avaliações lançadas", grades.length)}</div>
   <div class="two"><div>${formHTML(colabs, o.preset)}</div>
   <div><div class="card"><h2>Situação dos colaboradores (última avaliação)</h2>
@@ -190,13 +191,86 @@ export function vistaGestor(colabs, grades, o = {}) {
   <div class="card"><h2>Média por componente</h2>${barra("Teoria", media(grades.map(x => x.t)), 35)}${barra("Shadowing invertido", media(grades.map(x => x.s)), 45)}${barra("Navegação em sistema", media(grades.map(x => x.n)), 20)}</div>${faixas()}</div></div>
   <div class="card"><h2>Últimas avaliações</h2>${recentes.length ? recentes.map(g => {
     const hist = histAte(g, grades), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
-    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>
-      ${d !== null ? `<span class="dl ${d > 0 ? "up" : d < 0 ? "dn" : "eq"}">${d > 0 ? "▲ +" : d < 0 ? "▼ " : "= "}${d}</span>` : ""}
+    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
       · ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
       <span class="muted">${g.date}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
       ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
-  }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}</div>`;
+  }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}
+  ${grades.length > recentes.length ? `<button type="button" class="ghost mais" data-go="avaliacoes">Ver todas as avaliações →</button>` : ""}</div>`;
 }
+
+
+/* ---------- tela "Avaliações" (todas) ---------- */
+const PAGINA = 15;
+
+export function vistaAvaliacoes(colabs) {
+  return `<div class="page-head"><h2 class="page-title">Avaliações</h2>
+    <p class="muted">Todas as avaliações lançadas. Use os filtros para encontrar o que precisa.</p></div>
+  <div class="card filtros">
+    <div class="fl"><label for="fBusca">Buscar</label><input id="fBusca" type="search" placeholder="Colaborador ou treinamento"></div>
+    <div class="fl"><label for="fAval">Avaliador</label><select id="fAval"><option value="eu">Minhas avaliações</option><option value="todos">Todos os gestores</option></select></div>
+    <div class="fl"><label for="fColab">Colaborador</label><select id="fColab"><option value="">Todos</option>${colabs.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></div>
+    <div class="fl"><label for="fFaixa">Resultado</label><select id="fFaixa"><option value="">Todos</option>${Object.entries(STATUS).map(([k, s]) => `<option value="${k}">${esc(s.nome)} (${s.faixa})</option>`).join("")}</select></div>
+    <div class="fl"><label for="fNivel">Nível</label><select id="fNivel"><option value="">Todos</option><option>N1</option><option>N2</option></select></div>
+  </div>
+  <div id="avResumo"></div><div id="avLista"></div>`;
+}
+
+export function ligarAvaliacoes(root, colabs, grades, o = {}) {
+  const lista = root.querySelector("#avLista"); if (!lista) return;
+  let todas = grades.map(norm);
+  const nome = Object.fromEntries(colabs.map(c => [c.id, c.name]));
+  const f = id => root.querySelector("#" + id);
+  let limite = PAGINA;
+
+  const filtradas = () => {
+    const q = f("fBusca").value.trim().toLowerCase();
+    return todas.filter(g =>
+      (f("fAval").value === "todos" || g.managerId === o.uid) &&
+      (!f("fColab").value || g.employeeId === f("fColab").value) &&
+      (!f("fFaixa").value || g.status === f("fFaixa").value) &&
+      (!f("fNivel").value || g.level === f("fNivel").value) &&
+      (!q || (nome[g.employeeId] || "").toLowerCase().includes(q) || (g.training || "").toLowerCase().includes(q))
+    ).sort(porData);
+  };
+
+  const render = () => {
+    const l = filtradas(), vis = l.slice(0, limite);
+    const m = media(l.map(x => x.ipo));
+    f("avResumo").innerHTML = `<div class="grid">${kpi("Avaliações", l.length)}${kpi("Média do IPO", l.length ? m.toFixed(1) : "–", l.length ? STATUS[classificar(m)].cor : "")}${kpi("Prontos", l.filter(x => x.status === "pronto").length)}${kpi("Colaboradores", new Set(l.map(x => x.employeeId)).size)}</div>`;
+
+    lista.innerHTML = l.length
+      ? `<div class="card">${vis.map(g => {
+          const hist = histAte(g, todas), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
+          return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
+            <b class="av-nome">${esc(nome[g.employeeId] || "Colaborador")}</b>
+            <span class="muted">${esc(g.training)} · ${g.level} · ${g.date}${por(g)}</span>
+            ${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
+            ${g.comment ? `<div class="muted">Feedback: ${esc(g.comment)}</div>` : ""}
+            ${detalhes(g)}
+            ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
+        }).join("")}
+        ${l.length > vis.length ? `<button type="button" class="ghost mais" id="avMais">Mostrar mais (${l.length - vis.length})</button>` : ""}</div>`
+      : '<div class="card"><p class="muted">Nenhuma avaliação encontrada com esses filtros.</p></div>';
+
+    const mais = f("avMais");
+    if (mais) mais.onclick = () => { limite += PAGINA; render(); };
+
+    lista.querySelectorAll(".del").forEach(b => b.onclick = async () => {
+      if (!confirm("Excluir esta avaliação?")) return;
+      try {
+        await o.onExcluir(b.dataset.id);
+        todas = todas.filter(x => x.id !== b.dataset.id);
+        render();
+      } catch (e) { alert("Não foi possível excluir: " + (e.code || e.message)); }
+    });
+  };
+
+  root.querySelectorAll(".filtros input, .filtros select").forEach(el =>
+    el.addEventListener("input", () => { limite = PAGINA; render(); }));
+  render();
+}
+
 
 /* ---------- formulário do gestor ---------- */
 const campo = (cls, i, min, max, val, ph = "") => `<input type="number" class="${cls}" data-i="${i}" min="${min}" max="${max}" step="1" value="${val ?? ""}" placeholder="${ph}">`;

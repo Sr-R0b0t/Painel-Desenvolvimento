@@ -4,7 +4,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
-import { calcular, vistaGestor, vistaColaborador, ligarForm, esc } from "./ipo.js";
+import { calcular, vistaGestor, vistaColaborador, vistaAvaliacoes, ligarAvaliacoes, ligarForm, esc } from "./ipo.js";
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
@@ -12,7 +12,48 @@ const db = getFirestore(fb);
 
 const $ = s => document.querySelector(s);
 const app = $("#app");
-let me = null, pendingName = "", modoCadastro = false;
+let me = null, pendingName = "", modoCadastro = false, view = "inicio";
+
+/* ---------- Menu lateral (somente gestor) ---------- */
+const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const MENU = [
+  { id: "inicio", label: "Início", icon: ico('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>') },
+  { id: "avaliacoes", label: "Avaliações", icon: ico('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/>') }
+];
+
+function montarMenu() {
+  let nav = $("#sidebar");
+  if (!nav) {
+    nav = document.createElement("nav");
+    nav.id = "sidebar";
+    nav.className = "sidebar";
+    nav.setAttribute("aria-label", "Menu principal");
+    document.body.prepend(nav);
+  }
+  nav.innerHTML = MENU.map(m =>
+    `<button type="button" class="nav-item ${m.id === view ? "active" : ""}" data-view="${m.id}">${m.icon}<span>${m.label}</span></button>`
+  ).join("");
+  nav.querySelectorAll(".nav-item").forEach(b => b.onclick = () => irPara(b.dataset.view));
+  document.body.classList.add("has-sidebar");
+}
+
+function removerMenu() {
+  const nav = $("#sidebar");
+  if (nav) nav.remove();
+  document.body.classList.remove("has-sidebar");
+}
+
+function irPara(v) {
+  view = v;
+  montarMenu();
+  window.scrollTo(0, 0);
+  abrir();
+}
+
+function abrir() {
+  if (me.role !== "gestor") return telaColaborador();
+  return view === "avaliacoes" ? telaAvaliacoes() : telaGestor();
+}
 
 /* ---------- Login / Cadastro ---------- */
 function telaLogin(erro = "") {
@@ -20,6 +61,8 @@ function telaLogin(erro = "") {
   $("#role").hidden = true;
   $("#logout").hidden = true;
   if ($("#who")) $("#who").hidden = true;   // esconde o nome do usuário ao sair
+  removerMenu();
+  view = "inicio";
 
   // Sai do layout do painel (corrige a tela quebrada após o logout)
   document.body.classList.remove("dashboard-mode");
@@ -449,14 +492,20 @@ async function telaColaborador() {
   app.innerHTML = vistaColaborador(snap.docs.map(d => ({ id: d.id, ...d.data() })), me.name);
 }
 
-/* ---------- Gestor ---------- */
-async function telaGestor() {
+/* ---------- Gestor: dados ---------- */
+async function carregarGestor() {
   const [us, gs] = await Promise.all([
     getDocs(query(collection(db, "users"), where("role", "==", "colaborador"))),
     getDocs(collection(db, "grades"))
   ]);
   const colabs = us.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
   const grades = gs.docs.map(d => ({ id: d.id, ...d.data() }));
+  return { colabs, grades };
+}
+
+/* ---------- Gestor: Início ---------- */
+async function telaGestor() {
+  const { colabs, grades } = await carregarGestor();
   app.innerHTML = vistaGestor(colabs, grades, { podeExcluir: true });
 
   ligarForm(app, async d => {
@@ -472,6 +521,20 @@ async function telaGestor() {
 
   app.querySelectorAll(".del").forEach(b => b.onclick = async () => {
     if (confirm("Excluir esta avaliação?")) { await deleteDoc(doc(db, "grades", b.dataset.id)); telaGestor(); }
+  });
+
+  // botões que levam a outra tela do menu (ex.: "Ver todas as avaliações")
+  app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => irPara(b.dataset.go));
+}
+
+/* ---------- Gestor: Avaliações (todas) ---------- */
+async function telaAvaliacoes() {
+  const { colabs, grades } = await carregarGestor();
+  app.innerHTML = vistaAvaliacoes(colabs);
+  ligarAvaliacoes(app, colabs, grades, {
+    uid: me.uid,
+    podeExcluir: true,
+    onExcluir: id => deleteDoc(doc(db, "grades", id))
   });
 }
 
@@ -524,6 +587,10 @@ onAuthStateChanged(auth, async user => {
 
   $("#role").hidden = false; $("#role").textContent = me.role === "gestor" ? "Gestor" : "Colaborador";
   $("#logout").hidden = false;
-  me.role === "gestor" ? telaGestor() : telaColaborador();
+
+  // menu lateral só para o gestor
+  view = "inicio";
+  if (me.role === "gestor") montarMenu(); else removerMenu();
+  abrir();
 });
 $("#logout").onclick = () => signOut(auth);
