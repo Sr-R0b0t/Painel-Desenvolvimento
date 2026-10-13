@@ -80,6 +80,8 @@ const dBadge = d => d === null ? "" : `<span class="dl ${d > 0 ? "up" : d < 0 ? 
 /* ---------- gestor + evolução ---------- */
 const por = x => x.managerName ? ` · Avaliado por <b>${esc(x.managerName)}</b>` : "";
 const fmtData = d => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+// "2026-10-13" -> "13/10/2026" (só na exibição; o valor salvo continua em AAAA-MM-DD)
+const dataBR = d => d ? d.split("-").reverse().join("/") : "";
 
 // pontos GANHOS por item (em Erros/Retrabalho o valor salvo é "pontos perdidos", então invertemos)
 const itens = e => [
@@ -157,23 +159,51 @@ const detalhes = e => `<details><summary>Ver detalhes da nota</summary>
   <p class="muted"><b>Shadowing invertido</b> (${e.s}/45)</p>${e.cenarios && e.cenarios.length ? `<p class="muted">Situações aplicadas: ${e.cenarios.map(esc).join(", ")}</p>` : ""}${shadowCriterios(e.level).map((c, i) => `<div class="det"><span>${esc(c)}</span><b>${e.shadowing[i]}/5</b></div>`).join("")}
   <p class="muted"><b>Navegação em sistema</b> (${e.n}/20)</p>${SISTEMA.map(c => `<div class="det"><span>${esc(c.l)}${c.neg ? " (pontos perdidos)" : ""}</span><b>${e.sistema[c.k]}/4</b></div>`).join("")}</details>`;
 
+
 export function vistaColaborador(lista, nomeColab = "Colaborador") {
   const g = [...lista].map(norm).sort(porData);
-  if (!g.length) return '<div class="card"><p class="muted">Nenhuma avaliação lançada ainda.</p></div>';
+  const cab = `<div class="page-head"><h2 class="page-title">Meu progresso</h2>
+    <p class="muted">Acompanhe sua evolução e saiba qual é o seu próximo desafio.</p></div>`;
+  if (!g.length) return cab + '<div class="card"><p class="muted">Nenhuma avaliação lançada ainda.</p></div>';
+
   const e = g[0], st = STATUS[e.status], dif = g[1] ? e.ipo - g[1].ipo : null;
-  const pior = COMP.map(c => ({ l: c[0], p: e[c[4]] / c[3] })).sort((a, b) => a.p - b.p)[0];
-  return `<div class="two"><div class="card"><h2>Seu painel individual</h2>
-    <p class="muted">Aqui você acompanha sua evolução e sabe exatamente qual é o seu próximo desafio!</p>
-    <div class="top2"><div class="user"><span class="ico" style="background:#f26a1b">👤</span><div class="cb"><b>${esc(nomeColab)}</b><span class="bar"><i style="width:${e.ipo}%"></i></span></div></div>
-      <div class="atual"><small>PONTUAÇÃO ATUAL</small><b style="color:${st.cor}">${e.ipo}%</b></div></div>
-    ${comp(e)}
-    <div class="desafio"><span class="ico" style="background:#f26a1b">🎯</span><div><small>PRÓXIMO DESAFIO:</small><br><b>Aumentar sua pontuação em ${pior.l}!</b></div><span class="seta">→</span></div>
-    <p>${pill(e.status)} <span class="muted">${st.acao}${dif !== null ? ` · ${dif >= 0 ? "+" : ""}${dif} pontos desde a avaliação anterior` : ""}</span></p>
-    <p class="muted">${esc(e.training)} · ${e.date}${por(e)}${e.comment ? ` · Feedback do gestor: ${esc(e.comment)}` : ""}</p></div>
+
+  // próximo desafio: o componente com maior distância proporcional do máximo (ignora os que já estão no máximo)
+  const falta = COMP.map(c => ({ l: c[0], falta: c[3] - e[c[4]], p: e[c[4]] / c[3] }))
+    .filter(x => x.falta > 0)
+    .sort((a, b) => a.p - b.p)[0];
+
+  const desafio = falta
+    ? `<div class="desafio"><span class="ico" style="background:#f26a1b">🎯</span><div><small>PRÓXIMO DESAFIO:</small><br><b>Aumentar sua pontuação em ${falta.l}!</b> <span class="muted">(faltam ${falta.falta} ponto${falta.falta === 1 ? "" : "s"})</span></div><span class="seta">→</span></div>`
+    : `<div class="desafio"><span class="ico" style="background:#f2a20c">🏆</span><div><small>PARABÉNS!</small><br><b>Você atingiu a pontuação máxima!</b></div></div>`;
+
+  const kpis = `<div class="grid">
+    ${kpi("Pontuação atual", `${e.ipo}<small class="muted">/100</small>`, st.cor)}
+    <div class="card"><div class="muted">Situação</div><div class="kpi-pill">${pill(e.status)}</div><div class="muted">${esc(st.acao)}</div></div>
+    ${kpi("Desde a avaliação anterior", dif === null ? "–" : `${dif > 0 ? "▲ +" : dif < 0 ? "▼ " : "= "}${dif}`, dif === null || dif === 0 ? "" : dif > 0 ? "var(--ok)" : "var(--lo)")}
+    ${kpi("Avaliações realizadas", g.length)}
+  </div>`;
+
+  return `${cab}${kpis}
+  <div class="colab-grid">
     <div>
-    ${g.length > 1 ? `<div class="card"><h2>Minha evolução</h2>${evolucao(g)}</div>` : ""}
-    <div class="card"><h2>Histórico de avaliações</h2>${g.map(x => `<div class="item"><div class="hd"><b>${esc(x.training)}</b>${pill(x.status)}<b style="color:${STATUS[x.status].cor}">${x.ipo} pts</b></div>
-      <div class="muted">${x.date} · ${x.level}${por(x)}</div>${detalhes(x)}</div>`).join("")}</div>${faixas()}</div></div>`;
+      <div class="card"><h2>Seu painel individual</h2>
+        <div class="top2"><div class="user"><span class="ico" style="background:#f26a1b">👤</span><div class="cb"><b>${esc(nomeColab)}</b><span class="bar"><i style="width:${e.ipo}%"></i></span></div></div></div>
+        ${comp(e)}
+        ${desafio}
+        <p class="muted">${esc(e.training)} · ${dataBR(e.date)} · ${e.level}${por(e)}</p>
+        ${e.comment ? `<div class="fb"><small>FEEDBACK DO GESTOR</small><p>${esc(e.comment)}</p></div>` : ""}
+      </div>
+      ${faixas()}
+    </div>
+    <div>
+      ${g.length > 1 ? `<div class="card"><h2>Minha evolução</h2>${evolucao(g)}</div>` : ""}
+      <div class="card"><h2>Histórico de avaliações</h2>${g.map(x => `<div class="item"><div class="hd"><b>${esc(x.training)}</b>${pill(x.status)}<b style="color:${STATUS[x.status].cor}">${x.ipo} pts</b></div>
+        <div class="muted">${dataBR(x.date)} · ${x.level}${por(x)}</div>
+        ${x.comment ? `<div class="muted">Feedback: ${esc(x.comment)}</div>` : ""}
+        ${detalhes(x)}</div>`).join("")}</div>
+    </div>
+  </div>`;
 }
 
 export function vistaGestor(colabs, grades, o = {}) {
@@ -193,7 +223,7 @@ export function vistaGestor(colabs, grades, o = {}) {
     const hist = histAte(g, grades), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
     return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
       · ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
-      <span class="muted">${g.date}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
+      <span class="muted">${dataBR(g.date)}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
       ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
   }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}
   ${grades.length > recentes.length ? `<button type="button" class="ghost mais" data-go="avaliacoes">Ver todas as avaliações →</button>` : ""}</div>`;
@@ -244,7 +274,7 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
           const hist = histAte(g, todas), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
           return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
             <b class="av-nome">${esc(nome[g.employeeId] || "Colaborador")}</b>
-            <span class="muted">${esc(g.training)} · ${g.level} · ${g.date}${por(g)}</span>
+            <span class="muted">${esc(g.training)} · ${g.level} · ${dataBR(g.date)}${por(g)}</span>
             ${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
             ${g.comment ? `<div class="muted">Feedback: ${esc(g.comment)}</div>` : ""}
             ${detalhes(g)}

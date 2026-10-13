@@ -14,12 +14,19 @@ const $ = s => document.querySelector(s);
 const app = $("#app");
 let me = null, pendingName = "", modoCadastro = false, view = "inicio";
 
-/* ---------- Menu lateral (somente gestor) ---------- */
+/* ---------- Menu lateral ---------- */
 const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-const MENU = [
+
+const MENU_GESTOR = [
   { id: "inicio", label: "Início", icon: ico('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>') },
   { id: "avaliacoes", label: "Avaliações", icon: ico('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/>') }
 ];
+
+const MENU_COLAB = [
+  { id: "progresso", label: "Meu progresso", icon: ico('<path d="M3 20h18"/><path d="M6 16l4-5 3 3 5-7"/><path d="M15 7h3v3"/>') }
+];
+
+const menuAtual = () => me && me.role === "gestor" ? MENU_GESTOR : MENU_COLAB;
 
 function montarMenu() {
   let nav = $("#sidebar");
@@ -30,7 +37,7 @@ function montarMenu() {
     nav.setAttribute("aria-label", "Menu principal");
     document.body.prepend(nav);
   }
-  nav.innerHTML = MENU.map(m =>
+  nav.innerHTML = menuAtual().map(m =>
     `<button type="button" class="nav-item ${m.id === view ? "active" : ""}" data-view="${m.id}">${m.icon}<span>${m.label}</span></button>`
   ).join("");
   nav.querySelectorAll(".nav-item").forEach(b => b.onclick = () => irPara(b.dataset.view));
@@ -588,9 +595,9 @@ onAuthStateChanged(auth, async user => {
   $("#role").hidden = false; $("#role").textContent = me.role === "gestor" ? "Gestor" : "Colaborador";
   $("#logout").hidden = false;
 
-  // menu lateral só para o gestor
-  view = "inicio";
-  if (me.role === "gestor") montarMenu(); else removerMenu();
+  // menu lateral (gestor: Início/Avaliações · colaborador: Meu progresso)
+  view = me.role === "gestor" ? "inicio" : "progresso";
+  montarMenu();
   abrir();
 });
 $("#logout").onclick = () => signOut(auth);

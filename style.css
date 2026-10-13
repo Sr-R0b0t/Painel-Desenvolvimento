@@ -1568,12 +1568,62 @@ button.mais {
 }
 
 
+/* =========================================================
+   TELA DO COLABORADOR / LARGURA COM MENU
+   ========================================================= */
+
+/* com o menu lateral, o conteúdo aproveita mais a tela */
+body.dashboard-mode.has-sidebar main {
+  max-width: 1480px;
+}
+
+.colab-grid {
+  display: grid;
+  grid-template-columns: minmax(340px, 5fr) 7fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.colab-grid > div {
+  min-width: 0;
+}
+
+.kpi-pill {
+  margin: 10px 0 8px;
+}
+
+.fb {
+  margin-top: 12px;
+  padding: 10px 14px;
+
+  background: var(--soft);
+  border: 1px solid var(--soft-bd);
+  border-left: 4px solid var(--ac);
+  border-radius: 12px;
+}
+
+.fb small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--mu);
+}
+
+.fb p {
+  margin: 4px 0 0;
+  color: var(--ink);
+}
+
+
 
 /* =========================================================
    RESPONSIVO
    ========================================================= */
 
 @media (max-width: 900px) {
+  .colab-grid {
+    grid-template-columns: 1fr;
+  }
 
   .login-page {
     padding: 30px 20px;
