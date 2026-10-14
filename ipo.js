@@ -129,7 +129,7 @@ function evolucao(hist) {
   // Erros e Retrabalho são mostrados como "pontos perdidos" (igual ao formulário); o ▲/▼ indica melhora ou piora real
   const lista = (arr, vazio) => arr.length
     ? arr.map(x => `<div class="det"><span>${esc(x.l)} <span class="muted">· ${x.g}</span></span><b>${
-        x.neg ? `perdeu ${4 - x.ant} → perdeu ${4 - x.v}` : `${x.ant} → ${x.v}/${x.max}`
+        x.neg ? `antes ${4 - x.ant} pontos → depois ${4 - x.v}` : `${x.ant} → ${x.v}/${x.max}`
       } ${delta(x.d)}</b></div>`).join("")
     : `<p class="muted">${vazio}</p>`;
   return `<div class="evo">
@@ -229,8 +229,8 @@ export function vistaGestor(colabs, grades, o = {}) {
   <div class="card"><h2>Média por componente</h2>${barra("Teoria", media(grades.map(x => x.t)), 35)}${barra("Shadowing invertido", media(grades.map(x => x.s)), 45)}${barra("Navegação em sistema", media(grades.map(x => x.n)), 20)}</div>${faixas()}</div></div>
   <div class="card"><h2>Últimas avaliações</h2>${recentes.length ? recentes.map(g => {
     const hist = histAte(g, grades), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
-    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
-      · ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
+    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)} Colaborador :
+       ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
       <span class="muted">${dataBR(g.date)}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
       ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
   }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}
@@ -298,7 +298,7 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
             ${elo}
             ${g.comment ? `<div class="muted">Feedback: ${esc(g.comment)}</div>` : ""}
             ${detalhes(g)}
-            ${ant ? `<details ${abrirEvo ? "open" : ""}><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
+            ${ant ? `<details ${abrirEvo ? "close" : ""}><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
         }).join("")}
         ${l.length > vis.length ? `<button type="button" class="ghost mais" id="avMais">Mostrar mais (${l.length - vis.length})</button>` : ""}</div>`
       : '<div class="card"><p class="muted">Nenhuma avaliação encontrada com esses filtros.</p></div>';
@@ -356,7 +356,7 @@ function formHTML(colabs, p = {}) {
     <h3>2. Shadowing invertido · até 45 pontos</h3><p class="muted">O avaliador pontua cada critério de 1 a 5.</p>
     <div id="cenBox">${cenInputs(p.level || "N1", p.cenarios)}</div><div id="shBox">${shadowInputs(p.level || "N1", p.shadowing)}</div>
     <h3>3. Navegação em sistema · até 20 pontos</h3><p class="muted">Cada item vale até 4. Em Erros e Retrabalho, informe os pontos perdidos (0 = nenhum erro · 4 = perda total).</p>
-    ${SISTEMA.map(c => `<label class="crit"><span>${esc(c.l)} <span>${c.neg ? "perdidos 0–4 · vazio = 0" : "0–4"}</span></span>${campo("sy", c.k, 0, 4, q[c.k], c.neg ? "0" : "")}</label>`).join("")}
+    ${SISTEMA.map(c => `<label class="crit"><span>${esc(c.l)} <span>${c.neg ? " 0–4 " : "0–4"}</span></span>${campo("sy", c.k, 0, 4, q[c.k], c.neg ? "0" : "")}</label>`).join("")}
     <label>Feedback ao colaborador (opcional)</label><textarea id="cm" rows="2">${esc(p.comment || "")}</textarea>
     <div class="preview" id="pv"></div><button id="go">Salvar avaliação</button> <span id="msg" class="muted"></span></div></div>`;
 }
