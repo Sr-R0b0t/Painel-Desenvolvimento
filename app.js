@@ -4,7 +4,7 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWith
 import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, where, getDocs }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
-import { calcular, vistaGestor, vistaColaborador, vistaAvaliacoes, ligarAvaliacoes, ligarForm, esc } from "./ipo.js";
+import { calcular, vistaGestor, vistaColaborador, vistaAvaliacoes, ligarAvaliacoes, ligarForm, relatorioHTML, esc } from "./ipo.js";
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
@@ -60,6 +60,29 @@ function irPara(v) {
 function abrir() {
   if (me.role !== "gestor") return telaColaborador();
   return view === "avaliacoes" ? telaAvaliacoes() : telaGestor();
+}
+
+/* ---------- Exportar PDF (gestor) ---------- */
+// Monta o relatório numa área só de impressão e abre a janela de impressão do navegador
+// (nela, escolha "Salvar como PDF"). O CSS @media print esconde o resto da página.
+function exportarPDF(colabs, todas, filtradas) {
+  let area = $("#printArea");
+  if (!area) {
+    area = document.createElement("div");
+    area.id = "printArea";
+    document.body.append(area);
+  }
+  area.innerHTML = relatorioHTML(colabs, todas, filtradas);
+  document.body.classList.add("printing");
+
+  const fim = () => {
+    document.body.classList.remove("printing");
+    area.innerHTML = "";
+    window.removeEventListener("afterprint", fim);
+  };
+  window.addEventListener("afterprint", fim);
+
+  window.print();
 }
 
 /* ---------- Login / Cadastro ---------- */
@@ -541,7 +564,8 @@ async function telaAvaliacoes() {
   ligarAvaliacoes(app, colabs, grades, {
     uid: me.uid,
     podeExcluir: true,
-    onExcluir: id => deleteDoc(doc(db, "grades", id))
+    onExcluir: id => deleteDoc(doc(db, "grades", id)),
+    onExportar: (todas, lista) => exportarPDF(colabs, todas, lista)
   });
 }
 

@@ -154,6 +154,14 @@ const histAte = (g, grades) => {
   return i < 0 ? [g] : l.slice(i);
 };
 
+// posição da avaliação g na sequência do colaborador:
+// n = número da tentativa (1ª, 2ª...), anterior/proxima = avaliações vizinhas do mesmo colaborador
+const tentativa = (g, todas) => {
+  const l = todas.filter(x => x.employeeId === g.employeeId).sort(porData);
+  const i = l.findIndex(x => x.id === g.id);
+  return { n: l.length - i, total: l.length, anterior: l[i + 1] || null, proxima: i > 0 ? l[i - 1] : null };
+};
+
 const detalhes = e => `<details><summary>Ver detalhes da nota</summary>
   <p class="muted"><b>Teoria</b> (${e.t}/35)</p>${TEORIA.map((c, i) => `<div class="det"><span>${esc(c)}</span><b>${e.teoria[i]}/7</b></div>`).join("")}
   <p class="muted"><b>Shadowing invertido</b> (${e.s}/45)</p>${e.cenarios && e.cenarios.length ? `<p class="muted">Situações aplicadas: ${e.cenarios.map(esc).join(", ")}</p>` : ""}${shadowCriterios(e.level).map((c, i) => `<div class="det"><span>${esc(c)}</span><b>${e.shadowing[i]}/5</b></div>`).join("")}
@@ -234,8 +242,9 @@ export function vistaGestor(colabs, grades, o = {}) {
 const PAGINA = 15;
 
 export function vistaAvaliacoes(colabs) {
-  return `<div class="page-head"><h2 class="page-title">Avaliações</h2>
+  return `<div class="page-head head-flex"><div><h2 class="page-title">Avaliações</h2>
     <p class="muted">Todas as avaliações lançadas. Use os filtros para encontrar o que precisa.</p></div>
+    <button type="button" class="ghost" id="avPdf">⬇ Exportar PDF</button></div>
   <div class="card filtros">
     <div class="fl"><label for="fBusca">Buscar</label><input id="fBusca" type="search" placeholder="Colaborador ou treinamento"></div>
     <div class="fl"><label for="fAval">Avaliador</label><select id="fAval"><option value="eu">Minhas avaliações</option><option value="todos">Todos os gestores</option></select></div>
@@ -272,19 +281,38 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
     lista.innerHTML = l.length
       ? `<div class="card">${vis.map(g => {
           const hist = histAte(g, todas), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
-          return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
+          const t = tentativa(g, todas);
+          const recuperou = t.anterior && t.anterior.status !== "pronto" && g.status === "pronto";
+          const abrirEvo = t.anterior && t.anterior.status !== "pronto";
+          const st = x => `<b>${x.ipo} pts</b> (${esc(STATUS[x.status].nome)})`;
+          const elo = t.total > 1
+            ? `<div class="elo">${t.anterior ? `↳ Reavaliação · antes: ${st(t.anterior)}` : ""}${t.anterior && t.proxima ? " · " : ""}${t.proxima ? `Depois: ${st(t.proxima)}` : ""}
+                · <button type="button" class="link" data-colab="${g.employeeId}">ver só deste colaborador</button></div>`
+            : "";
+          return `<div class="item ${t.total > 1 ? "ligado" : ""}"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
             <b class="av-nome">${esc(nome[g.employeeId] || "Colaborador")}</b>
+            ${t.total > 1 ? `<span class="tent">${t.n}ª avaliação</span>` : ""}
+            ${recuperou ? `<span class="tent ok">✔ Recuperou</span>` : ""}
             <span class="muted">${esc(g.training)} · ${g.level} · ${dataBR(g.date)}${por(g)}</span>
             ${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
+            ${elo}
             ${g.comment ? `<div class="muted">Feedback: ${esc(g.comment)}</div>` : ""}
             ${detalhes(g)}
-            ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
+            ${ant ? `<details ${abrirEvo ? "open" : ""}><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
         }).join("")}
         ${l.length > vis.length ? `<button type="button" class="ghost mais" id="avMais">Mostrar mais (${l.length - vis.length})</button>` : ""}</div>`
       : '<div class="card"><p class="muted">Nenhuma avaliação encontrada com esses filtros.</p></div>';
 
     const mais = f("avMais");
     if (mais) mais.onclick = () => { limite += PAGINA; render(); };
+
+    // "ver só deste colaborador" aplica o filtro de colaborador
+    lista.querySelectorAll("[data-colab]").forEach(b => b.onclick = () => {
+      f("fColab").value = b.dataset.colab;
+      limite = PAGINA;
+      render();
+      window.scrollTo(0, 0);
+    });
 
     lista.querySelectorAll(".del").forEach(b => b.onclick = async () => {
       if (!confirm("Excluir esta avaliação?")) return;
@@ -298,6 +326,15 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
 
   root.querySelectorAll(".filtros input, .filtros select").forEach(el =>
     el.addEventListener("input", () => { limite = PAGINA; render(); }));
+
+  // exportar PDF: usa as avaliações que estão passando pelos filtros agora
+  const pdf = f("avPdf");
+  if (pdf) pdf.onclick = () => {
+    const l = filtradas();
+    if (!l.length) { alert("Não há avaliações para exportar com esses filtros."); return; }
+    o.onExportar && o.onExportar(todas, l);
+  };
+
   render();
 }
 
@@ -361,4 +398,53 @@ export function ligarForm(root, onSave) {
     try { await onSave(d); } catch (e) { m.textContent = "Não foi possível salvar: " + (e.code || e.message); }
   };
   pv();
+}
+
+
+/* ---------- relatório em PDF (gestor) ---------- */
+// filtradas = avaliações que passaram nos filtros (define quem entra);
+// o histórico de cada pessoa usa TODAS as avaliações, para a evolução ficar completa.
+export function relatorioHTML(colabs, todas, filtradas) {
+  const all = todas.map(norm);
+  const nome = Object.fromEntries(colabs.map(c => [c.id, c.name]));
+  const ids = [...new Set(filtradas.map(g => g.employeeId))]
+    .sort((a, b) => (nome[a] || "").localeCompare(nome[b] || ""));
+  const hists = ids.map(id => ({ id, hist: all.filter(g => g.employeeId === id).sort(porData) }));
+
+  const deprimeira = hists.filter(x => x.hist[x.hist.length - 1].status === "pronto").length;
+  const mIpo = media(hists.map(x => x.hist[0].ipo));
+  const hoje = new Date().toLocaleDateString("pt-BR");
+
+  const resumo = hists.length ? `<div class="grid">
+    ${kpi("Colaboradores", hists.length)}
+    ${kpi("Média do IPO (última)", mIpo.toFixed(1), STATUS[classificar(mIpo)].cor)}
+    ${kpi("Prontos de primeira", `${deprimeira}/${hists.length}`)}
+    ${kpi("Avaliações no período", filtradas.length)}
+  </div>` : '<p class="muted">Nenhuma avaliação para exibir.</p>';
+
+  const secoes = hists.map(({ id, hist }) => {
+    const ult = hist[0], prim = hist[hist.length - 1];
+    const primeiraOk = prim.status === "pronto";
+    const linhas = hist.map(x => `<tr>
+      <td>${dataBR(x.date)}</td><td>${esc(x.training)}</td><td>${x.level}</td><td>${esc(x.managerName || "–")}</td>
+      <td>${x.t}/35</td><td>${x.s}/45</td><td>${x.n}/20</td><td><b>${x.ipo}</b></td><td>${pill(x.status)}</td></tr>`).join("");
+
+    return `<section class="rel-colab">
+      <div class="hd"><h2 style="margin:0">${esc(nome[id] || "Colaborador")}</h2>${pill(ult.status)}
+        <b style="color:${STATUS[ult.status].cor}">${ult.ipo} pts</b></div>
+      <p class="muted">${hist.length} avaliaç${hist.length === 1 ? "ão" : "ões"} ·
+        ${primeiraOk ? "✔ Pronto na primeira avaliação" : "Não atingiu “Pronto” na primeira avaliação"}</p>
+      ${comp(ult)}
+      ${primeiraOk ? "" : `<h3>Evolução</h3>${evolucao(hist)}`}
+      <h3>Histórico</h3>
+      <table class="rel-tab"><thead><tr><th>Data</th><th>Treinamento</th><th>Nível</th><th>Avaliador</th>
+        <th>Teoria</th><th>Shadow.</th><th>Sistema</th><th>IPO</th><th>Situação</th></tr></thead>
+        <tbody>${linhas}</tbody></table>
+      ${ult.comment ? `<div class="fb"><small>ÚLTIMO FEEDBACK</small><p>${esc(ult.comment)}</p></div>` : ""}
+    </section>`;
+  }).join("");
+
+  return `<div class="rel-capa">
+    <h1>Relatório de avaliações — IPO</h1>
+    <p class="muted">Gerado em ${hoje}</p>${resumo}</div>${secoes}`;
 }

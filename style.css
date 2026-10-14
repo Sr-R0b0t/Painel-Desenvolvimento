@@ -1615,6 +1615,75 @@ body.dashboard-mode.has-sidebar main {
 }
 
 
+.head-flex { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: flex-start; 
+  gap: 12px; 
+  flex-wrap: wrap; }
+
+#printArea { 
+  display: none; 
+}
+
+.rel-tab { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.rel-tab th, .rel-tab td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #f0e6da; }
+.rel-tab th { color: var(--mu); font-weight: 700; font-size: 11px; }
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  body.printing > *:not(#printArea) { display: none !important; }
+  body.printing::before, body.printing::after { display: none !important; }
+  body.printing { background: #fff !important; padding: 0 !important; }
+  body.printing #printArea { display: block; }
+
+  .rel-capa { margin-bottom: 18px; }
+  .rel-colab { break-inside: avoid; page-break-after: always; }
+  .rel-colab:last-child { page-break-after: auto; }
+  .rel-colab .evo-head, .rel-colab .evgrid, .rel-colab .det { break-inside: avoid; }
+}
+
+
+/* avaliações ligadas ao mesmo colaborador */
+.item.ligado {
+  border-left: 3px solid var(--ac);
+  padding-left: 14px;
+}
+
+.tent {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ac);
+  background: #fff1e3;
+  border: 1px solid var(--soft-bd);
+  border-radius: 99px;
+  padding: 1px 9px;
+  white-space: nowrap;
+}
+
+.tent.ok {
+  color: var(--ok);
+  background: #e6f6ea;
+  border-color: #cdebd5;
+}
+
+.elo {
+  margin: 4px 0;
+  font-size: 12px;
+  color: var(--mu);
+}
+
+.elo b { color: var(--ink); }
+
+.elo button.link {
+  margin: 0;
+  font-size: 12px;
+}
+
 
 /* =========================================================
    RESPONSIVO
