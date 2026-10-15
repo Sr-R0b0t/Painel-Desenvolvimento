@@ -5,6 +5,7 @@ import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 import { calcular, vistaGestor, vistaColaborador, vistaAvaliacoes, ligarAvaliacoes, ligarForm, relatorioHTML, esc } from "./ipo.js";
+import { vistaRelatorio, ligarRelatorio } from "./relatorio.js";
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
@@ -19,7 +20,8 @@ const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 
 const MENU_GESTOR = [
   { id: "inicio", label: "Início", icon: ico('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>') },
-  { id: "avaliacoes", label: "Avaliações", icon: ico('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/>') }
+  { id: "avaliacoes", label: "Avaliações", icon: ico('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 16h4"/>') },
+  { id: "relatorio", label: "Envio de relatório", icon: ico('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>') }
 ];
 
 const MENU_COLAB = [
@@ -59,20 +61,22 @@ function irPara(v) {
 
 function abrir() {
   if (me.role !== "gestor") return telaColaborador();
-  return view === "avaliacoes" ? telaAvaliacoes() : telaGestor();
+  if (view === "avaliacoes") return telaAvaliacoes();
+  if (view === "relatorio") return telaRelatorio();
+  return telaGestor();
 }
 
-/* ---------- Exportar PDF (gestor) ---------- */
-// Monta o relatório numa área só de impressão e abre a janela de impressão do navegador
+/* ---------- Imprimir / Exportar PDF (gestor) ---------- */
+// Monta o HTML numa área só de impressão e abre a janela de impressão do navegador
 // (nela, escolha "Salvar como PDF"). O CSS @media print esconde o resto da página.
-function exportarPDF(colabs, todas, filtradas) {
+function imprimirHTML(html) {
   let area = $("#printArea");
   if (!area) {
     area = document.createElement("div");
     area.id = "printArea";
     document.body.append(area);
   }
-  area.innerHTML = relatorioHTML(colabs, todas, filtradas);
+  area.innerHTML = html;
   document.body.classList.add("printing");
 
   const fim = () => {
@@ -84,6 +88,8 @@ function exportarPDF(colabs, todas, filtradas) {
 
   window.print();
 }
+
+const exportarPDF = (colabs, todas, filtradas) => imprimirHTML(relatorioHTML(colabs, todas, filtradas));
 
 /* ---------- Login / Cadastro ---------- */
 function telaLogin(erro = "") {
@@ -111,10 +117,7 @@ function telaLogin(erro = "") {
 
       <div class="login-container">
 
-        <!-- =================================================
-             LADO ESQUERDO
-             ================================================= -->
-
+        <!-- LADO ESQUERDO -->
         <div class="login-brand">
 
           <h1>
@@ -129,33 +132,22 @@ function telaLogin(erro = "") {
             <strong>transforma resultados.</strong>
           </p>
 
-          <!--
-            Coloque sua imagem de ilustração aqui:
-
-            assets/login-illustration.png
-          -->
-
+          <!-- Imagem de ilustração: assets/imgs/ilustracao-login.png -->
           <div class="login-illustration">
-
             <img
               src="./assets/imgs/ilustracao-login.png"
               alt="Pessoa estudando"
               onerror="this.style.display='none'"
             >
-
           </div>
 
         </div>
 
 
-        <!-- =================================================
-             CARD DE LOGIN
-             ================================================= -->
-
+        <!-- CARD DE LOGIN -->
         <div class="login-card">
 
           <div class="login-icon">
-
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -167,9 +159,7 @@ function telaLogin(erro = "") {
               <circle cx="12" cy="8" r="3.5"></circle>
               <path d="M5 20c.8-3.3 3.1-5 7-5s6.2 1.7 7 5"></path>
             </svg>
-
           </div>
-
 
           <h2 class="login-title">
             ${modoCadastro ? "Criar conta" : "Bem-vindo(a)!"}
@@ -184,17 +174,10 @@ function telaLogin(erro = "") {
 
 
           <!-- Nome somente no cadastro -->
-
           ${modoCadastro ? `
-
             <div class="login-field">
-
-              <label for="nome">
-                Nome completo
-              </label>
-
+              <label for="nome">Nome completo</label>
               <div class="input-wrapper">
-
                 <input
                   id="nome"
                   class="login-input"
@@ -202,26 +185,16 @@ function telaLogin(erro = "") {
                   placeholder="Digite seu nome"
                   autocomplete="name"
                 >
-
               </div>
-
             </div>
-
           ` : ""}
 
 
           <!-- E-mail -->
-
           <div class="login-field">
-
-            <label for="email">
-              E-mail
-            </label>
-
+            <label for="email">E-mail</label>
             <div class="input-wrapper">
-
               <span class="input-icon">
-
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
@@ -233,9 +206,7 @@ function telaLogin(erro = "") {
                   <rect x="3" y="5" width="18" height="14" rx="2"></rect>
                   <path d="m3 7 9 6 9-6"></path>
                 </svg>
-
               </span>
-
               <input
                 id="email"
                 class="login-input"
@@ -243,24 +214,15 @@ function telaLogin(erro = "") {
                 placeholder="Digite seu e-mail"
                 autocomplete="email"
               >
-
             </div>
-
           </div>
 
 
           <!-- Senha -->
-
           <div class="login-field">
-
-            <label for="senha">
-              Senha
-            </label>
-
+            <label for="senha">Senha</label>
             <div class="input-wrapper">
-
               <span class="input-icon">
-
                 <svg
                   viewBox="0 0 24 24"
                   fill="none"
@@ -272,9 +234,7 @@ function telaLogin(erro = "") {
                   <rect x="5" y="10" width="14" height="10" rx="2"></rect>
                   <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
                 </svg>
-
               </span>
-
 
               <input
                 id="senha"
@@ -284,14 +244,12 @@ function telaLogin(erro = "") {
                 autocomplete="${modoCadastro ? "new-password" : "current-password"}"
               >
 
-
               <button
                 type="button"
                 class="password-toggle"
                 id="toggleSenha"
                 aria-label="Mostrar senha"
               >
-
                 <svg
                   id="eyeIcon"
                   viewBox="0 0 24 24"
@@ -304,60 +262,30 @@ function telaLogin(erro = "") {
                   <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
                   <circle cx="12" cy="12" r="2.5"></circle>
                 </svg>
-
               </button>
-
             </div>
-
           </div>
 
 
           <!-- Erro -->
-
-          <div
-            id="erro"
-            class="login-error"
-          >
-            ${esc(erro)}
-          </div>
+          <div id="erro" class="login-error">${esc(erro)}</div>
 
 
           <!-- Entrar -->
-
-          <button
-            id="ok"
-            class="login-submit"
-          >
-
+          <button id="ok" class="login-submit">
             <span class="login-submit-content">
-
-              <span>
-                ${modoCadastro ? "Cadastrar" : "Entrar"}
-              </span>
-
-              <span class="login-submit-arrow">
-                →
-              </span>
-
+              <span>${modoCadastro ? "Cadastrar" : "Entrar"}</span>
+              <span class="login-submit-arrow">→</span>
             </span>
-
           </button>
 
 
           <!-- Divisor -->
-
-          <div class="login-divider">
-            <span>ou</span>
-          </div>
+          <div class="login-divider"><span>ou</span></div>
 
 
           <!-- Criar conta -->
-
-          <button
-            type="button"
-            class="login-create"
-            id="troca"
-          >
+          <button type="button" class="login-create" id="troca">
             ${modoCadastro
               ? "Já tenho uma conta"
               : "Criar conta de colaborador"
@@ -372,148 +300,65 @@ function telaLogin(erro = "") {
   `;
 
 
-  /* =======================================================
-     TROCAR LOGIN / CADASTRO
-     ======================================================= */
-
+  /* TROCAR LOGIN / CADASTRO */
   $("#troca").onclick = () => {
-
     modoCadastro = !modoCadastro;
-
     telaLogin();
-
   };
 
 
-  /* =======================================================
-     MOSTRAR / OCULTAR SENHA
-     ======================================================= */
-
+  /* MOSTRAR / OCULTAR SENHA */
   $("#toggleSenha").onclick = () => {
-
     const senha = $("#senha");
     const icon = $("#eyeIcon");
 
     if (senha.type === "password") {
-
       senha.type = "text";
-
       icon.innerHTML = `
         <path d="M3 3l18 18"></path>
         <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"></path>
         <path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6 0 9.5 7 9.5 7a17.6 17.6 0 0 1-3.2 4.2"></path>
         <path d="M6.3 6.3C3.9 8 2.5 12 2.5 12s3.5 7 9.5 7c1.1 0 2.1-.2 3-.6"></path>
       `;
-
     } else {
-
       senha.type = "password";
-
       icon.innerHTML = `
         <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
         <circle cx="12" cy="12" r="2.5"></circle>
       `;
-
     }
-
   };
 
 
-  /* =======================================================
-     LOGIN / CADASTRO
-     ======================================================= */
-
+  /* LOGIN / CADASTRO */
   $("#ok").onclick = async () => {
-
     const email = $("#email").value.trim();
     const senha = $("#senha").value;
 
     try {
-
       if (modoCadastro) {
-
         pendingName = $("#nome").value.trim();
 
-        if (!pendingName) {
+        if (!pendingName) { $("#erro").textContent = "Informe seu nome."; return; }
+        if (!email) { $("#erro").textContent = "Informe seu e-mail."; return; }
+        if (!senha) { $("#erro").textContent = "Informe sua senha."; return; }
 
-          $("#erro").textContent =
-            "Informe seu nome.";
-
-          return;
-        }
-
-        if (!email) {
-
-          $("#erro").textContent =
-            "Informe seu e-mail.";
-
-          return;
-        }
-
-        if (!senha) {
-
-          $("#erro").textContent =
-            "Informe sua senha.";
-
-          return;
-        }
-
-        await createUserWithEmailAndPassword(
-          auth,
-          email,
-          senha
-        );
-
+        await createUserWithEmailAndPassword(auth, email, senha);
       } else {
+        if (!email || !senha) { $("#erro").textContent = "Informe seu e-mail e sua senha."; return; }
 
-        if (!email || !senha) {
-
-          $("#erro").textContent =
-            "Informe seu e-mail e sua senha.";
-
-          return;
-        }
-
-        await signInWithEmailAndPassword(
-          auth,
-          email,
-          senha
-        );
-
+        await signInWithEmailAndPassword(auth, email, senha);
       }
-
     } catch (e) {
-
       console.error(e);
-
-      $("#erro").textContent =
-        "Não foi possível entrar: " + e.code;
-
+      $("#erro").textContent = "Não foi possível entrar: " + e.code;
     }
-
   };
 
 
-  /* =======================================================
-     ENTER PARA ENVIAR
-     ======================================================= */
-
-  $("#email").addEventListener("keydown", e => {
-
-    if (e.key === "Enter") {
-      $("#ok").click();
-    }
-
-  });
-
-  $("#senha").addEventListener("keydown", e => {
-
-    if (e.key === "Enter") {
-      $("#ok").click();
-    }
-
-  });
-
+  /* ENTER PARA ENVIAR */
+  $("#email").addEventListener("keydown", e => { if (e.key === "Enter") $("#ok").click(); });
+  $("#senha").addEventListener("keydown", e => { if (e.key === "Enter") $("#ok").click(); });
 }
 
 /* ---------- Colaborador ---------- */
@@ -569,28 +414,35 @@ async function telaAvaliacoes() {
   });
 }
 
+/* ---------- Gestor: Envio de relatório ---------- */
+async function telaRelatorio() {
+  const { colabs, grades } = await carregarGestor();
+  app.innerHTML = vistaRelatorio(grades);
+  ligarRelatorio(app, colabs, grades, {
+    carregar: async id => {
+      const s = await getDoc(doc(db, "relatorios", id));
+      return s.exists() ? s.data() : null;
+    },
+    salvar: (id, data) => setDoc(doc(db, "relatorios", id), {
+      ...data, updatedAt: Date.now(), managerId: me.uid, managerName: me.name
+    }),
+    onPdf: imprimirHTML
+  });
+}
+
 /* ---------- Estado de login ---------- */
 onAuthStateChanged(auth, async user => {
 
   if (!user) {
-
     me = null;
-
     return telaLogin();
   }
 
-  // ============================================
   // SAI DO LAYOUT DE LOGIN
-  // ============================================
-
   document.body.classList.remove("login-mode");
-
   document.querySelector("main").classList.remove("login-main");
 
-  // ============================================
   // ATIVA O LAYOUT DO SISTEMA
-  // ============================================
-
   document.body.classList.add("dashboard-mode");
 
   const ref = doc(db, "users", user.uid);
@@ -601,10 +453,7 @@ onAuthStateChanged(auth, async user => {
   }
   me = { uid: user.uid, ...snap.data() };
 
-  // ============================================
   // NOME DO USUÁRIO LOGADO NO CABEÇALHO
-  // ============================================
-
   let who = $("#who");
   if (!who) {
     who = document.createElement("span");
@@ -619,7 +468,7 @@ onAuthStateChanged(auth, async user => {
   $("#role").hidden = false; $("#role").textContent = me.role === "gestor" ? "Gestor" : "Colaborador";
   $("#logout").hidden = false;
 
-  // menu lateral (gestor: Início/Avaliações · colaborador: Meu progresso)
+  // menu lateral (gestor: Início/Avaliações/Envio de relatório · colaborador: Meu progresso)
   view = me.role === "gestor" ? "inicio" : "progresso";
   montarMenu();
   abrir();

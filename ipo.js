@@ -129,7 +129,7 @@ function evolucao(hist) {
   // Erros e Retrabalho são mostrados como "pontos perdidos" (igual ao formulário); o ▲/▼ indica melhora ou piora real
   const lista = (arr, vazio) => arr.length
     ? arr.map(x => `<div class="det"><span>${esc(x.l)} <span class="muted">· ${x.g}</span></span><b>${
-        x.neg ? `antes ${4 - x.ant} pontos → depois ${4 - x.v}` : `${x.ant} → ${x.v}/${x.max}`
+        x.neg ? `perdeu ${4 - x.ant} → perdeu ${4 - x.v}` : `${x.ant} → ${x.v}/${x.max}`
       } ${delta(x.d)}</b></div>`).join("")
     : `<p class="muted">${vazio}</p>`;
   return `<div class="evo">
@@ -221,16 +221,19 @@ export function vistaGestor(colabs, grades, o = {}) {
   const cont = k => ult.filter(x => x.g.status === k).length;
   const mIpo = media(ult.map(x => x.g.ipo));
   const recentes = [...grades].sort(porData).slice(0, 5);
+  // turmas já usadas (sugestões do campo "Turma" do formulário), da mais recente para a mais antiga
+  const turmas = [...new Set(grades.map(g => (g.turma || "").trim()).filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a, "pt", { numeric: true }));
   return `<div class="grid">${kpi("Colaboradores avaliados", ult.length)}${kpi("Média do IPO", ult.length ? mIpo.toFixed(1) : "–", STATUS[classificar(mIpo)].cor)}${kpi("Prontos (80 a 100)", cont("pronto"))}${kpi("Avaliações lançadas", grades.length)}</div>
-  <div class="two"><div>${formHTML(colabs, o.preset)}</div>
+  <div class="two"><div>${formHTML(colabs, o.preset, turmas)}</div>
   <div><div class="card"><h2>Situação dos colaboradores (última avaliação)</h2>
     ${Object.keys(STATUS).map(k => `<div class="det"><span>${pill(k)}</span><b>${cont(k)}</b></div>`).join("")}</div>
   <div class="card"><h2>Ranking por IPO</h2>${ult.length ? ult.map(x => barra(x.c.name, x.g.ipo, 100)).join("") : '<p class="muted">Sem avaliações ainda.</p>'}</div>
   <div class="card"><h2>Média por componente</h2>${barra("Teoria", media(grades.map(x => x.t)), 35)}${barra("Shadowing invertido", media(grades.map(x => x.s)), 45)}${barra("Navegação em sistema", media(grades.map(x => x.n)), 20)}</div>${faixas()}</div></div>
   <div class="card"><h2>Últimas avaliações</h2>${recentes.length ? recentes.map(g => {
     const hist = histAte(g, grades), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
-    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)} Colaborador :
-       ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
+    return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
+      · ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
       <span class="muted">${dataBR(g.date)}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
       ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
   }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}
@@ -273,13 +276,22 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
     ).sort(porData);
   };
 
+  // mantém as avaliações do mesmo colaborador sempre juntas, independente da data:
+  // os grupos ficam ordenados pela avaliação mais recente de cada um; dentro do grupo, da mais recente à mais antiga
+  const agrupar = lista => {
+    const ordem = new Map();
+    [...lista].sort(porData).forEach(g => { if (!ordem.has(g.employeeId)) ordem.set(g.employeeId, ordem.size); });
+    return [...lista].sort((a, b) => ordem.get(a.employeeId) - ordem.get(b.employeeId) || porData(a, b));
+  };
+
   const render = () => {
-    const l = filtradas(), vis = l.slice(0, limite);
+    const l = agrupar(filtradas()), vis = l.slice(0, limite);
     const m = media(l.map(x => x.ipo));
     f("avResumo").innerHTML = `<div class="grid">${kpi("Avaliações", l.length)}${kpi("Média do IPO", l.length ? m.toFixed(1) : "–", l.length ? STATUS[classificar(m)].cor : "")}${kpi("Prontos", l.filter(x => x.status === "pronto").length)}${kpi("Colaboradores", new Set(l.map(x => x.employeeId)).size)}</div>`;
 
     lista.innerHTML = l.length
-      ? `<div class="card">${vis.map(g => {
+      ? `<div class="card">${vis.map((g, idx) => {
+          const segue = vis[idx + 1] && vis[idx + 1].employeeId === g.employeeId;
           const hist = histAte(g, todas), ant = hist[1], d = ant ? g.ipo - ant.ipo : null;
           const t = tentativa(g, todas);
           const recuperou = t.anterior && t.anterior.status !== "pronto" && g.status === "pronto";
@@ -289,7 +301,7 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
             ? `<div class="elo">${t.anterior ? `↳ Reavaliação · antes: ${st(t.anterior)}` : ""}${t.anterior && t.proxima ? " · " : ""}${t.proxima ? `Depois: ${st(t.proxima)}` : ""}
                 · <button type="button" class="link" data-colab="${g.employeeId}">ver só deste colaborador</button></div>`
             : "";
-          return `<div class="item ${t.total > 1 ? "ligado" : ""}"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
+          return `<div class="item ${t.total > 1 ? "ligado" : ""} ${segue ? "grp-cont" : ""}"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
             <b class="av-nome">${esc(nome[g.employeeId] || "Colaborador")}</b>
             ${t.total > 1 ? `<span class="tent">${t.n}ª avaliação</span>` : ""}
             ${recuperou ? `<span class="tent ok">✔ Recuperou</span>` : ""}
@@ -345,18 +357,20 @@ const shadowInputs = (nivel, v = []) => shadowCriterios(nivel).map((c, i) => `<l
 
 const cenInputs = (nivel, sel = []) => `<p class="muted">Situações aplicadas (${nivel}):</p>` + CENARIOS[nivel].map(c => `<label class="chk"><input type="checkbox" class="cen" value="${esc(c)}" ${sel.includes(c) ? "checked" : ""}> ${esc(c)}</label>`).join("");
 
-function formHTML(colabs, p = {}) {
+function formHTML(colabs, p = {}, turmas = []) {
   const q = p.sistema || {};
   return `<div class="card"><h2>Lançar avaliação (IPO)</h2><div id="formIpo">
     <label>Colaborador</label><select id="emp">${colabs.length ? colabs.map(c => `<option value="${c.id}" ${c.id === p.employeeId ? "selected" : ""}>${esc(c.name)}</option>`).join("") : '<option value="">Nenhum colaborador cadastrado</option>'}</select>
     <div class="two2"><div><label>Nível</label><select id="lvl"><option>N1</option><option ${p.level === "N2" ? "selected" : ""}>N2</option></select></div>
     <div><label>Treinamento</label><input id="tr" value="${esc(p.training || "")}" placeholder="Ex.: Admissional"></div></div>
+    <label>Turma</label><input id="turma" list="listaTurmas" value="${esc(p.turma || "")}" placeholder="Ex.: Turma 12" autocomplete="off">
+    <datalist id="listaTurmas">${turmas.map(t => `<option value="${esc(t)}"></option>`).join("")}</datalist>
     <h3>1. Teoria · até 35 pontos</h3><p class="muted">Nota da prova (Forms) em cada tema, de 0 a 7.</p>
     ${TEORIA.map((c, i) => `<label class="crit"><span>${esc(c)} <span>0–7</span></span>${campo("te", i, 0, 7, (p.teoria || [])[i])}</label>`).join("")}
     <h3>2. Shadowing invertido · até 45 pontos</h3><p class="muted">O avaliador pontua cada critério de 1 a 5.</p>
     <div id="cenBox">${cenInputs(p.level || "N1", p.cenarios)}</div><div id="shBox">${shadowInputs(p.level || "N1", p.shadowing)}</div>
     <h3>3. Navegação em sistema · até 20 pontos</h3><p class="muted">Cada item vale até 4. Em Erros e Retrabalho, informe os pontos perdidos (0 = nenhum erro · 4 = perda total).</p>
-    ${SISTEMA.map(c => `<label class="crit"><span>${esc(c.l)} <span>${c.neg ? " 0–4 " : "0–4"}</span></span>${campo("sy", c.k, 0, 4, q[c.k], c.neg ? "0" : "")}</label>`).join("")}
+    ${SISTEMA.map(c => `<label class="crit"><span>${esc(c.l)} <span>${c.neg ? "perdidos 0–4 · vazio = 0" : "0–4"}</span></span>${campo("sy", c.k, 0, 4, q[c.k], c.neg ? "0" : "")}</label>`).join("")}
     <label>Feedback ao colaborador (opcional)</label><textarea id="cm" rows="2">${esc(p.comment || "")}</textarea>
     <div class="preview" id="pv"></div><button id="go">Salvar avaliação</button> <span id="msg" class="muted"></span></div></div>`;
 }
@@ -369,9 +383,10 @@ function ler(f) {
     sistema[i.dataset.i] = i.value === "" ? (neg ? 0 : NaN) : +i.value; // Erros/Retrabalho: vazio = 0
   });
   return { employeeId: f.querySelector("#emp").value, level: f.querySelector("#lvl").value, training: f.querySelector("#tr").value.trim(),
+    turma: f.querySelector("#turma").value.trim(),
     teoria: vals(f, "te"), shadowing: vals(f, "sh"), sistema, cenarios: [...f.querySelectorAll(".cen:checked")].map(i => i.value), comment: f.querySelector("#cm").value.trim() };
 }
-const valido = d => d.employeeId && d.training && d.teoria.every(x => x >= 0 && x <= 7) && d.shadowing.every(x => x >= 1 && x <= 5) &&
+const valido = d => d.employeeId && d.turma && d.training && d.teoria.every(x => x >= 0 && x <= 7) && d.shadowing.every(x => x >= 1 && x <= 5) &&
   SISTEMA.every(c => d.sistema[c.k] >= 0 && d.sistema[c.k] <= 4);
 
 export function ligarForm(root, onSave) {
@@ -394,7 +409,7 @@ export function ligarForm(root, onSave) {
   f.querySelector("#lvl").onchange = e => { f.querySelector("#cenBox").innerHTML = cenInputs(e.target.value, [...f.querySelectorAll(".cen:checked")].map(i => i.value)); f.querySelector("#shBox").innerHTML = shadowInputs(e.target.value, vals(f, "sh").map(x => isNaN(x) ? "" : x)); pv(); };
   f.querySelector("#go").onclick = async () => {
     const d = ler(f), m = f.querySelector("#msg");
-    if (!valido(d)) { m.textContent = "Preencha tudo: colaborador, treinamento e todas as notas dentro dos limites."; return; }
+    if (!valido(d)) { m.textContent = "Preencha tudo: colaborador, turma, treinamento e todas as notas dentro dos limites."; return; }
     try { await onSave(d); } catch (e) { m.textContent = "Não foi possível salvar: " + (e.code || e.message); }
   };
   pv();
