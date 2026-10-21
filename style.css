@@ -1726,6 +1726,165 @@ body.dashboard-mode.has-sidebar main {
 
 
 /* =========================================================
+   ANIMAÇÕES DO PAINEL
+   Cole no final do style.css (ou carregue depois dele).
+   Só animam na troca de tela; filtros e digitação não reanimam.
+   ========================================================= */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+@keyframes draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes flutua {
+  from { translate: 0 0; }
+  to   { translate: 14px 10px; }
+}
+
+@keyframes abrir {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- Entrada dos blocos de cada tela ---------- */
+#app > .page-head,
+#app > .card,
+#app > .grid > .card,
+#app > .two > div > .card,
+#app > .colab-grid > div > .card,
+#rCorpo > .card {
+  animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* escalonado: um bloco entra depois do outro */
+#app > .grid > .card:nth-child(2) { animation-delay: 0.06s; }
+#app > .grid > .card:nth-child(3) { animation-delay: 0.12s; }
+#app > .grid > .card:nth-child(4) { animation-delay: 0.18s; }
+
+#app > .two > div > .card:nth-child(1),
+#app > .colab-grid > div > .card:nth-child(1),
+#rCorpo > .card:nth-child(1) { animation-delay: 0.15s; }
+#app > .two > div > .card:nth-child(2),
+#app > .colab-grid > div > .card:nth-child(2),
+#rCorpo > .card:nth-child(2) { animation-delay: 0.22s; }
+#app > .two > div > .card:nth-child(3),
+#app > .colab-grid > div > .card:nth-child(3),
+#rCorpo > .card:nth-child(3) { animation-delay: 0.29s; }
+#app > .two > div > .card:nth-child(4),
+#app > .colab-grid > div > .card:nth-child(4) { animation-delay: 0.36s; }
+
+#app > .card { animation-delay: 0.3s; }
+
+/* ---------- Barras (ranking, médias, componentes) crescem da esquerda ---------- */
+.bar i {
+  transform-origin: left center;
+  animation: grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s backwards;
+}
+
+/* ---------- Gráfico de evolução: linha se desenha e os pontos aparecem ---------- */
+.evo-svg polyline {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw 1.1s ease 0.3s forwards;
+}
+
+.evo-svg circle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 0.9s backwards;
+}
+
+/* ---------- Detalhes (abrir/fechar) ---------- */
+details[open] > :not(summary) {
+  animation: abrir 0.3s ease backwards;
+}
+
+/* ---------- Interações (hover) ---------- */
+body.dashboard-mode .grid > .card,
+body.dashboard-mode .comp,
+body.dashboard-mode .faixa,
+body.dashboard-mode .desafio {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.dashboard-mode .grid > .card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 60px rgba(90, 60, 35, 0.12), 0 4px 16px rgba(242, 106, 27, 0.08);
+}
+
+body.dashboard-mode .comp:hover,
+body.dashboard-mode .faixa:hover {
+  transform: translateX(3px);
+}
+
+body.dashboard-mode .item {
+  transition: background 0.2s ease;
+}
+
+body.dashboard-mode .item:hover {
+  background: rgba(255, 138, 43, 0.04);
+}
+
+/* ---------- Troca de tela no menu ---------- */
+body.dashboard-mode .sidebar .nav-item {
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+body.dashboard-mode .sidebar .nav-item:hover:not(.active) {
+  transform: translateX(3px);
+}
+
+/* ---------- Login ---------- */
+.login-card {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s backwards;
+}
+
+.login-brand {
+  animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+.login-illustration {
+  animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) 0.25s backwards;
+}
+
+.login-decoration {
+  animation: flutua 9s ease-in-out infinite alternate;
+}
+
+.login-decoration.top-right    { animation-duration: 11s; }
+.login-decoration.bottom-left  { animation-duration: 13s; animation-direction: alternate-reverse; }
+.login-decoration.bottom-right { animation-duration: 10s; animation-direction: alternate-reverse; }
+
+/* ---------- Respeita quem prefere menos movimento, e a impressão ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .evo-svg polyline { stroke-dashoffset: 0; }
+}
+
+@media print {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .evo-svg polyline { stroke-dashoffset: 0; }
+}
+
+
+/* =========================================================
    RESPONSIVO
    ========================================================= */
 

@@ -6,6 +6,7 @@ import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query
 import { firebaseConfig } from "./firebase-config.js";
 import { calcular, vistaGestor, vistaColaborador, vistaAvaliacoes, ligarAvaliacoes, ligarForm, relatorioHTML, esc } from "./ipo.js";
 import { vistaRelatorio, ligarRelatorio } from "./relatorio.js";
+import { observarAnimacoes } from "./animacoes.js";
 
 const fb = initializeApp(firebaseConfig);
 const auth = getAuth(fb);
@@ -13,6 +14,7 @@ const db = getFirestore(fb);
 
 const $ = s => document.querySelector(s);
 const app = $("#app");
+observarAnimacoes(app);   // contador animado dos KPIs a cada troca de tela
 let me = null, pendingName = "", modoCadastro = false, view = "inicio";
 
 /* ---------- Menu lateral ---------- */
