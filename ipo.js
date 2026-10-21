@@ -116,8 +116,34 @@ function grafico(hist) {
   return `<svg viewBox="0 0 ${W} ${H}" class="evo-svg" role="img" aria-label="Evolução do IPO">${guias}${linha}${pontos}</svg>`;
 }
 
+// medidor semicircular 0–100: faixas de resultado ao fundo e arco preenchido de 0 até o IPO
+function medidor(e) {
+  const C = 120, R = 90, cor = STATUS[e.status].cor;
+  const pt = (v, r = R) => { const a = Math.PI * (1 - v / 100); return [(C + r * Math.cos(a)).toFixed(1), (C - r * Math.sin(a)).toFixed(1)]; };
+  const arco = (a, b) => { const [x1, y1] = pt(a), [x2, y2] = pt(b); return `M${x1} ${y1} A${R} ${R} 0 0 1 ${x2} ${y2}`; };
+  const faixasBg = [[0, 60, STATUS.reforco.cor], [60, 80, STATUS.desenvolvimento.cor], [80, 100, STATUS.pronto.cor]]
+    .map(([a, b, c]) => `<path d="${arco(a, b)}" fill="none" stroke="${c}" stroke-width="14" opacity=".18"/>`).join("");
+  const marcas = [0, 60, 80, 100].map(v => { const [x, y] = pt(v, R + 18); return `<text x="${x}" y="${+y + 3}" text-anchor="middle" font-size="9" fill="#9aa1ac">${v}</text>`; }).join("");
+  const [px, py] = pt(e.ipo);
+  return `<svg viewBox="0 0 240 150" class="gauge" role="img" aria-label="Pontuação ${e.ipo} de 100">
+    ${faixasBg}
+    <path class="gauge-fill" d="${arco(0, 100)}" pathLength="100" fill="none" stroke="${cor}" stroke-width="14" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="${100 - e.ipo}" style="--off:${100 - e.ipo}"/>
+    <circle class="gauge-dot" cx="${px}" cy="${py}" r="9" fill="#fff" stroke="${cor}" stroke-width="4"/>
+    ${marcas}
+    <text x="${C}" y="108" text-anchor="middle" font-size="38" font-weight="800" fill="#263449">${e.ipo}</text>
+    <text x="${C}" y="126" text-anchor="middle" font-size="11" fill="#9aa1ac">de 100 pontos</text></svg>`;
+}
+
 function evolucao(hist) {
-  if (hist.length < 2) return '<p class="muted">Esta é a primeira avaliação. A comparação aparece a partir da segunda.</p>';
+  if (hist.length < 2) {
+    // só uma avaliação: mostra o medidor de 0 até a pontuação (em vez de comparação)
+    const g = hist[0], st = STATUS[g.status], falta = Math.max(0, 80 - g.ipo);
+    const comps = COMP.map(([l, , , max, f]) => `<div class="evc"><span class="muted">${l}</span><b>${g[f]}/${max}</b></div>`).join("");
+    return `<div class="evo evo-um">${medidor(g)}
+      <div class="evo-um-txt">${pill(g.status)} <div class="muted">${esc(st.acao)}</div>
+        <p class="muted">${g.status === "pronto" ? "Pronto na primeira avaliação! 🎉" : `Faltam ${falta} ponto${falta === 1 ? "" : "s"} para chegar a “Pronto” (80).`} A comparação com avaliações anteriores aparece a partir da segunda.</p></div>
+      <div class="evgrid">${comps}</div></div>`;
+  }
   const a = hist[0], b = hist[1], primeira = hist[hist.length - 1];
   const cmp = comparar(a, b);
   const melhor = cmp.filter(x => x.d > 0).sort((x, y) => y.d - x.d);
@@ -205,7 +231,7 @@ export function vistaColaborador(lista, nomeColab = "Colaborador") {
       ${faixas()}
     </div>
     <div>
-      ${g.length > 1 ? `<div class="card"><h2>Minha evolução</h2>${evolucao(g)}</div>` : ""}
+      <div class="card"><h2>${g.length > 1 ? "Minha evolução" : "Minha pontuação"}</h2>${evolucao(g)}</div>
       <div class="card"><h2>Histórico de avaliações</h2>${g.map(x => `<div class="item"><div class="hd"><b>${esc(x.training)}</b>${pill(x.status)}<b style="color:${STATUS[x.status].cor}">${x.ipo} pts</b></div>
         <div class="muted">${dataBR(x.date)} · ${x.level}${por(x)}</div>
         ${x.comment ? `<div class="muted">Feedback: ${esc(x.comment)}</div>` : ""}
@@ -235,7 +261,7 @@ export function vistaGestor(colabs, grades, o = {}) {
     return `<div class="item"><div class="hd">${pill(g.status)}<b>${g.ipo} pts</b>${dBadge(d)}
       · ${esc(nome[g.employeeId] || "Colaborador")} · ${esc(g.training)} · ${g.level}
       <span class="muted">${dataBR(g.date)}${por(g)}</span>${o.podeExcluir ? `<button class="del" data-id="${g.id}">excluir</button>` : ""}</div>
-      ${ant ? `<details><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
+      <details><summary>${ant ? "Ver evolução do colaborador" : "Ver dashboard do colaborador"}</summary>${evolucao(hist)}</details></div>`;
   }).join("") : '<p class="muted">Nenhuma avaliação ainda.</p>'}
   ${grades.length > recentes.length ? `<button type="button" class="ghost mais" data-go="avaliacoes">Ver todas as avaliações →</button>` : ""}</div>`;
 }
@@ -310,7 +336,7 @@ export function ligarAvaliacoes(root, colabs, grades, o = {}) {
             ${elo}
             ${g.comment ? `<div class="muted">Feedback: ${esc(g.comment)}</div>` : ""}
             ${detalhes(g)}
-            ${ant ? `<details ${abrirEvo ? "close" : ""}><summary>Ver evolução do colaborador</summary>${evolucao(hist)}</details>` : ""}</div>`;
+            <details ${abrirEvo ? "close" : ""}><summary>${ant ? "Ver evolução do colaborador" : "Ver dashboard do colaborador"}</summary>${evolucao(hist)}</details></div>`;
         }).join("")}
         ${l.length > vis.length ? `<button type="button" class="ghost mais" id="avMais">Mostrar mais (${l.length - vis.length})</button>` : ""}</div>`
       : '<div class="card"><p class="muted">Nenhuma avaliação encontrada com esses filtros.</p></div>';

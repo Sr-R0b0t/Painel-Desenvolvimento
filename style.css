@@ -1724,7 +1724,6 @@ body.dashboard-mode.has-sidebar main {
   margin: 0; 
 }
 
-
 /* =========================================================
    ANIMAÇÕES DO PAINEL
    Cole no final do style.css (ou carregue depois dele).
@@ -1881,6 +1880,23 @@ body.dashboard-mode .sidebar .nav-item:hover:not(.active) {
 @media print {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .evo-svg polyline { stroke-dashoffset: 0; }
+}
+
+/* ---------- Medidor 0–100 (avaliação única) ---------- */
+.gauge { display: block; width: 100%; max-width: 320px; margin: 0 auto; height: auto; }
+.evo-um-txt { text-align: center; margin: 4px 0 14px; }
+
+@keyframes gauge {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: var(--off); }
+}
+
+.gauge-fill { animation: gauge 1.2s cubic-bezier(0.2, 0.7, 0.2, 1) 0.3s backwards; }
+
+.gauge-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 1.3s backwards;
 }
 
 
